@@ -1,0 +1,287 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Caça-Palavras Interativo</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+      margin: 0;
+    }
+
+    #word-search {
+      display: grid;
+      grid-template-columns: repeat(14, minmax(22px, 1fr));
+      gap: 2px;
+      justify-content: center;
+      margin: 20px auto;
+      max-width: 100vw;
+      touch-action: none;
+    }
+
+    .cell {
+      aspect-ratio: 1 / 1;
+      background-color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      font-size: min(4vw, 18px);
+      cursor: pointer;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .cell.selected {
+      background-color: #add8e6;
+    }
+
+    .cell.found {
+      background-color: #90ee90;
+    }
+
+    #word-list ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    #word-list li.found {
+      text-decoration: line-through;
+      color: green;
+    }
+
+    #congrats {
+      font-size: 20px;
+      color: green;
+      margin-top: 20px;
+      display: none;
+    }
+
+    #more-games {
+      margin-top: 20px;
+      display: none;
+    }
+
+    #more-games a {
+      text-decoration: none;
+      background-color: #4caf50;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+
+    #more-games a:hover {
+      background-color: #388e3c;
+    }
+
+    #next-container {
+      margin-top: 10px;
+      display: none;
+    }
+
+    #next-game {
+      padding: 10px 20px;
+      font-weight: bold;
+      border: none;
+      background-color: #2196f3;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #next-game:hover {
+      background-color: #1976d2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Caça-Palavras</h1>
+  <div id="word-search"></div>
+
+  <div id="word-list">
+    <h2>Palavras:</h2>
+    <ul id="words"></ul>
+  </div>
+
+  <div id="congrats">🎉 Parabéns, você localizou todas as palavras!!</div>
+
+  <div id="more-games">
+    <a href="https://ursacentauri.com.br" target="_blank">Mais jogos</a>
+  </div>
+
+  <div id="next-container">
+    <button id="next-game">Próximo</button>
+  </div>
+
+  <script>
+    const allWords = ["MISERICORDIA", "HUMILDE", "SERMÃO", "AMOR", "GRAÇA", "PERDÃO", "COMPAIXÃO", "BEMAVENTURADO", "EMPATIA", "MAT5:7", "LUC18:10", "LUC7:36", "MAT18:23", "JUSTIÇA", "DISCIPULADO", "PACIÊNCIA", "AMOROSO"];
+    let words = [];
+
+    const gridSize = 14;
+    let grid = [];
+    let cells = [];
+    let foundWords = new Set();
+
+    let selecting = false;
+    let selectedCells = [];
+
+    function resetGame() {
+      grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(''));
+      cells = [];
+      foundWords = new Set();
+      selecting = false;
+      selectedCells = [];
+
+      document.getElementById("congrats").style.display = "none";
+      document.getElementById("more-games").style.display = "none";
+      document.getElementById("next-container").style.display = "none";
+
+      const filtered = allWords.filter(w => w.length <= gridSize);
+      words = filtered.sort(() => 0.5 - Math.random()).slice(0, 5);
+      showWords();
+      placeWords();
+      fillGridRandom();
+      renderGrid();
+    }
+
+    function placeWords() {
+      for (let word of words) {
+        let placed = false;
+        while (!placed) {
+          const row = Math.floor(Math.random() * gridSize);
+          const col = Math.floor(Math.random() * (gridSize - word.length));
+          let fits = true;
+          for (let i = 0; i < word.length; i++) {
+            if (grid[row][col + i] && grid[row][col + i] !== word[i]) {
+              fits = false;
+              break;
+            }
+          }
+          if (fits) {
+            for (let i = 0; i < word.length; i++) {
+              grid[row][col + i] = word[i];
+            }
+            placed = true;
+          }
+        }
+      }
+    }
+
+    function fillGridRandom() {
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          if (!grid[row][col]) {
+            grid[row][col] = letters[Math.floor(Math.random() * letters.length)];
+          }
+        }
+      }
+    }
+
+    function renderGrid() {
+      const container = document.getElementById("word-search");
+      container.innerHTML = "";
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.textContent = grid[row][col];
+          cell.dataset.row = row;
+          cell.dataset.col = col;
+          container.appendChild(cell);
+          cells.push(cell);
+
+          // Desktop
+          cell.addEventListener("mousedown", () => startSelection(cell));
+          cell.addEventListener("mouseover", () => continueSelection(cell));
+          cell.addEventListener("mouseup", () => endSelection());
+
+          // Mobile
+          cell.addEventListener("touchstart", e => {
+            e.preventDefault();
+            startSelection(cell);
+          }, { passive: false });
+          cell.addEventListener("touchmove", e => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains("cell")) {
+              continueSelection(target);
+            }
+          }, { passive: false });
+          cell.addEventListener("touchend", e => {
+            e.preventDefault();
+            endSelection();
+          }, { passive: false });
+        }
+      }
+
+      // Para evitar stuck no desktop
+      document.addEventListener("mouseup", () => endSelection());
+    }
+
+    function showWords() {
+      const ul = document.getElementById("words");
+      ul.innerHTML = "";
+      words.forEach(word => {
+        const li = document.createElement("li");
+        li.textContent = word;
+        li.id = `word-${word}`;
+        li.classList.remove("found");
+        ul.appendChild(li);
+      });
+    }
+
+    function startSelection(cell) {
+      clearSelection();
+      selecting = true;
+      addToSelection(cell);
+    }
+
+    function continueSelection(cell) {
+      if (selecting && !selectedCells.includes(cell)) {
+        addToSelection(cell);
+      }
+    }
+
+    function endSelection() {
+      if (!selecting || selectedCells.length === 0) return;
+      const selectedWord = selectedCells.map(c => c.textContent).join("");
+      if (words.includes(selectedWord) && !foundWords.has(selectedWord)) {
+        foundWords.add(selectedWord);
+        selectedCells.forEach(c => c.classList.add("found"));
+        document.getElementById(`word-${selectedWord}`).classList.add("found");
+
+        if (foundWords.size === words.length) {
+          document.getElementById("congrats").style.display = "block";
+          document.getElementById("more-games").style.display = "block";
+          document.getElementById("next-container").style.display = "block";
+        }
+      } else {
+        selectedCells.forEach(c => c.classList.remove("selected"));
+      }
+      selecting = false;
+      selectedCells = [];
+    }
+
+    function addToSelection(cell) {
+      cell.classList.add("selected");
+      selectedCells.push(cell);
+    }
+
+    function clearSelection() {
+      selectedCells.forEach(c => c.classList.remove("selected"));
+      selectedCells = [];
+    }
+
+    resetGame();
+    document.getElementById("next-game").addEventListener("click", resetGame);
+  </script>
+</body>
+</html>
